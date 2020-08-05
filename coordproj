@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+#
+# Bash script for reprojecting coordinate using cs2cs 
+# from the Proj library (https://proj.org/apps/cs2cs.html)
+#
+# Author: anton.bakker@kadaster.nl
+# Date: 28/05/2020
+
+EPSG_IN=$1
+EPSG_OUT=$2
+X=$3
+Y=$4
+
+PROJ_LIB=/usr/share/proj
+PROJ_DEBUG=0
+
+function usage {
+    echo "usage: $PROGRAM_NAME <input_epsg_code> <output_epsg_code> <X> <Y>"
+    exit 1
+}
+
+if test "$#" -ne 4; then
+    usage
+fi
+
+set -eu
+
+echo $X $Y | cs2cs -f "%.6f" +init=epsg:$EPSG_IN +to +init=epsg:$EPSG_OUT

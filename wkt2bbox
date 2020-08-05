@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+function usage {
+    echo "usage: $PROGRAM_NAME <wkt_string|-(wkt_string on stdin)>"
+    echo "  arguments:"
+    echo "  - <wkt_string>: POLYGON WKT string describing bounding box (arg or stdin)"
+    exit 1
+}
+
+PROGRAM_NAME=$(basename $0)
+
+if [ "$#" -ne 1 ]; then
+    usage
+fi
+
+set -eu
+
+function process_wktstring(){
+    local input_string
+    input_string=$1
+    echo "$input_string" | perl -pe 's/POLYGON\s?\(\((\d+\.?\d*)\s(\d+\.?\d*),.*?,(\d+\.?\d*)\s(\d+\.?\d*).*$/$1,$2,$3,$4/'
+}
+
+WKT_STRING=${1:--}
+if [[ $WKT_STRING == "-" ]];then
+    if [ -t 0 ]; then
+    # if do not allow interactive tty
+        usage
+        exit 1
+    fi
+    while read line
+    do
+        process_wktstring "$line"
+    done < "/dev/stdin"
+else
+    process_wktstring "$WKT_STRING"
+fi

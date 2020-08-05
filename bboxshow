@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+#
+# Bash script for displaying bbox
+#
+# Author: anton.bakker@kadaster.nl
+# Date: 28/05/2020
+
+function usage {
+    echo "usage: $PROGRAM_NAME <bbox>"
+    echo "  arguments:"
+    echo "  - <bbox>: \$minx,\$miny,\$maxx,\$maxy in EPSG:4326 (arg or stdin)"
+    exit 1
+}
+
+PROGRAM_NAME=$(basename $0)
+
+set -eu
+
+function open_url(){
+    local bbox min_x max_x min_y max_y url
+    bbox=$1
+    min_x=$(echo $bbox | awk -F, '{print $1}')
+    min_y=$(echo $bbox | awk -F, '{print $2}')
+    max_x=$(echo $bbox | awk -F, '{print $3}')
+    max_y=$(echo $bbox | awk -F, '{print $4}')
+    url="http://bboxfinder.com/#${min_y},${min_x},${max_y},${max_x}"
+    if which xdg-open > /dev/null
+    then
+        xdg-open "$url"
+    elif which gnome-open > /dev/null
+    then
+        gnome-open "$url"
+    fi
+}
+
+BBOX=${1:--}
+if [[ $BBOX == "-" ]];then
+# BBOX passed on stdin
+    if [ -t 0 ]; then
+    # if do not allow interactive tty
+        usage
+        exit 1
+    fi
+    while read line
+    do
+        open_url "$line"
+    done < "/dev/stdin"
+else
+# BBOX passed as argument 
+    open_url "$BBOX"
+fi

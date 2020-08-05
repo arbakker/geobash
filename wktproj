@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+#
+# Bash script for reprojecting bbox string (format: "$minx,$miny,$maxx,$maxy") using cs2cs 
+# from the Proj library (https://proj.org/apps/cs2cs.html)
+#
+# Author: anton.bakker@kadaster.nl
+# Date: 28/05/2020
+
+PROGRAM_NAME=$(basename $0)
+EPSG_IN=$1
+EPSG_OUT=$2
+WKT_STRING=${3:--}
+
+PROJ_LIB=/usr/share/proj
+PROJ_DEBUG=0
+
+function usage {
+    echo "usage: $PROGRAM_NAME <input_epsg_code> <output_epsg_code> <wkt_string|-(wkt_string on stdin)> "
+    echo "    - <wkt_string>: single geometry WKT string"
+    echo "    - <epsg_code>: [0-9]+"
+    exit 1
+}
+
+if test "$#" -ne 3; then
+    usage
+fi
+
+set -eu
+
+function process_wkt_string(){
+    local wkt_string input_epsg_code output_epsg_code
+    input_epsg_code=$1
+    output_epsg_code=$2
+    wkt_string=$3
+    geom_type=$(echo "$wkt_string" | perl -pe 's/(.*?)\(\(.*?\)\)/$1/')
+    coord_string=$(echo "$wkt_string" | perl -pe 's/.*?\(\((.*?)\)\)/$1/')
+    IFS=","
+    result="${geom_type}(("
+    for coord in $coord_string;do
+        trans_coord=$(echo $coord | cs2cs -f "%.6f" +init=epsg:$input_epsg_code +to +init=epsg:$output_epsg_code)
+        trans_xy=$(echo "$trans_coord" | perl -pe 's/(.*?)\s(.*?)\s.*/$1 $2/')
+        result="${result}${trans_xy},"
+    done
+    result="${result%?}"
+    result="${result}))"
+    echo "$result"
+}
+
+if [[ $WKT_STRING == "-" ]];then
+# WKT_STRING passed on stdin
+    if [ -t 0 ]; then
+    # if do not allow interactive tty
+        usage
+        exit 1
+    fi
+    while read line
+    do
+        process_wkt_string $EPSG_IN $EPSG_OUT "$line"
+    done < "/dev/stdin"
+else
+# BBOX passed as argument 
+    process_wkt_string $EPSG_IN $EPSG_OUT "$WKT_STRING"
+fi

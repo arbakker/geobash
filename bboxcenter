@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+#
+# Bash script for getting center of bbox
+#
+# Author: anton.bakker@kadaster.nl
+# Date: 28/05/2020
+
+PROGRAM_NAME=$(basename $0)
+BBOX=$1
+
+function usage {
+    echo "usage: $PROGRAM_NAME <bbox|-(bbox on stdin)> "
+    echo "    - <bbox>: \$minx,\$miny,\$maxx,\$maxy"
+    exit 1
+}
+
+if test "$#" -ne 1; then
+    usage
+fi
+
+function process_bbox(){
+    local bbox
+    bbox="$1"
+    xmin=$(echo $bbox | cut -d, -f1)
+    xmax=$(echo $bbox | cut -d, -f3)
+    ymin=$(echo $bbox | cut -d, -f2)
+    ymax=$(echo $bbox | cut -d, -f4)
+    x_range_half=$(awk "BEGIN {printf \"%.7f\n\", ($ymax - $ymin)/2}")
+    y_range_half=$(awk "BEGIN {printf \"%.7f\n\", ($xmax - $xmin)/2}")
+    center_x=$(awk "BEGIN {printf \"%.7f\n\", $x_range_half + $xmin}")
+    center_y=$(awk "BEGIN {printf \"%.7f\n\", $y_range_half + $ymin}")
+    echo "${center_x} ${center_y}"
+}
+
+
+set -eu
+
+if [[ $BBOX == "-" ]];then
+# BBOX passed on stdin
+    if [ -t 0 ]; then
+    # if do not allow interactive tty
+        usage
+    fi
+    while read line
+    do
+        process_bbox "$line"
+    done < "/dev/stdin"
+else
+# BBOX passed as argument 
+    process_bbox "$BBOX"
+fi
+
+
+

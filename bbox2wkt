@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+
+function usage {
+    echo "usage: $PROGRAM_NAME <bbox>"
+    echo "  arguments:"
+    echo "  - <bbox>: \$minx,\$miny,\$maxx,\$maxy in EPSG:4326 (arg or stdin)"
+    exit 1
+}
+
+PROGRAM_NAME=$(basename $0)
+
+set -eu
+
+function process_bbox(){
+    local input_string
+    local array
+    local minx
+    local maxx
+    local miny
+    local maxy
+
+    input_string=$1
+    if [[ -z $input_string ]];then
+        return
+    fi
+    
+    IFS=', ' read -r -a array <<< "$input_string"
+    minx=${array[0]}
+    miny=${array[1]}
+    maxx=${array[2]}
+    maxy=${array[3]}
+    echo "POLYGON(($minx $miny,$minx $maxy,$maxx $maxy,$maxx $miny,$minx $miny))"
+}
+
+BBOX=${1:--}
+if [[ $BBOX == "-" ]];then
+# BBOX passed on stdin
+    if [ -t 0 ]; then
+    # if do not allow interactive tty
+        usage
+        exit 1
+    fi
+    while read line
+    do
+        process_bbox "$line"
+    done < "/dev/stdin"
+else
+# BBOX passed as argument 
+    process_bbox "$BBOX"
+fi
