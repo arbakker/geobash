@@ -6,7 +6,10 @@
 # Date: 28/05/2020
 
 PROGRAM_NAME=$(basename $0)
-BBOX=$1
+BBOX="${@}"
+BBOX="${BBOX:--}"
+BBOX="${BBOX//[[:space:]]/}"
+
 
 function usage {
     echo "usage: $PROGRAM_NAME <bbox|-(bbox on stdin)> "
@@ -14,7 +17,7 @@ function usage {
     exit 1
 }
 
-if test "$#" -ne 1; then
+if test "$#" -lt 1; then
     usage
 fi
 

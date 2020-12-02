@@ -33,7 +33,11 @@ function open_url(){
     fi
 }
 
-BBOX=${1:--}
+
+BBOX="${@}"
+BBOX="${BBOX:--}"
+BBOX="${BBOX//[[:space:]]/}"
+
 if [[ $BBOX == "-" ]];then
 # BBOX passed on stdin
     if [ -t 0 ]; then

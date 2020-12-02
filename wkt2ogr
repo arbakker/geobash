@@ -1,71 +1,63 @@
 #!/usr/bin/env bash
+#
+# Bash script for reprojecting bbox string (format: "$minx,$miny,$maxx,$maxy") using cs2cs 
+# from the Proj library (https://proj.org/apps/cs2cs.html)
+#
+# Author: anton.bakker@kadaster.nl
+# Date: 28/05/2020
+
 PROGRAM_NAME=$(basename $0)
-INPUT_FILE=${1:--}
-INPUT_SRS=${2}
-FORMAT=${3}
-OUTPUT_FILE=${4}
-LAYERNAME=${5}
+EPSG_IN=$1
+EPSG_OUT=$2
+WKT_STRING=${3:--}
+
+PROJ_LIB=/usr/share/proj
+PROJ_DEBUG=0
 
 function usage {
-    echo "usage: $PROGRAM_NAME <wkt_file|-(wkt objects on stdin)> <input_srs> <output_format> <output_file> <layername>"
-    echo "    - <wkt_file|-(wkt objects on stdin>: file containing wkt geometries or pass wkt objects on stdin"
-    echo "    - <input_srs>: epsg code of input data"
-    echo "    - <output_format>: ogr2ogr output format"
-    echo "    - <output_file>: destination file"
-    echo "    - <layername>: layername in output file"
-    echo ""
-    echo "description: convert wkt objects to geospatial file (any vector file format supported by ogr2ogr)."
-    echo "  Requires ogr/gdal and ogr2ogr binary to be available in PATH."
+    echo "usage: $PROGRAM_NAME <input_epsg_code> <output_epsg_code> <wkt_string|-(wkt_string on stdin)> "
+    echo "    - <wkt_string>: single geometry WKT string"
+    echo "    - <epsg_code>: [0-9]+"
     exit 1
 }
 
-set -eu
-
-if [ "$#" -ne 5 ]; then
+if test "$#" -ne 3; then
     usage
 fi
 
-VRT_STRING="<OGRVRTDataSource>
-    <OGRVRTLayer name=\"wkt_convert\">
-       <SrcDataSource>/tmp/wkt_convert.csv</SrcDataSource>
-      <GeometryType>wkbPolygon</GeometryType>
- <LayerSRS>{{input_srs}}</LayerSRS>
- <GeometryField encoding=\"WKT\" field=\"wkt\"></GeometryField >
-     </OGRVRTLayer>
-</OGRVRTDataSource>"
-CSV_FILE="/tmp/wkt_convert.csv"
+set -eu
 
-function process_wkt_strings(){
-    local wkt_strings format output_file layername input_srs
-    wkt_strings="$1"
-    input_srs="$2"
-    format="$3"
-    output_file="$4"
-    layername="$5"
-    echo "id,wkt" > $CSV_FILE
-    i=0
-    while IFS= read -r wkt_string; do
-        echo "$i,\"$wkt_string\"" >> $CSV_FILE
-        i=$((i+1))
-    done <<< "$wkt_strings"
-    SRS_WKT=$(gdalsrsinfo  "EPSG:$input_srs" -o WKT)
-    SRS_WKT=${SRS_WKT/\"/\\\"}
-    VRT_STRING=${VRT_STRING/\{\{input_srs\}\}/$SRS_WKT}
-    echo "$VRT_STRING" > /tmp/ogr.vrt
-    rm -f "$output_file"
-    ogr2ogr -f "$format" "/tmp/$(basename $output_file)" /tmp/ogr.vrt -nln "$layername" wkt_convert
-    ogr2ogr -f "$format" "$output_file" "/tmp/$(basename $output_file)" -sql "select geom from $layername" -nln "$layername"
+function process_wkt_string(){
+    local wkt_string input_epsg_code output_epsg_code
+    input_epsg_code=$1
+    output_epsg_code=$2
+    wkt_string=$3
+    geom_type=$(echo "$wkt_string" | perl -pe 's/(.*?)\(\(.*?\)\)/$1/')
+    coord_string=$(echo "$wkt_string" | perl -pe 's/.*?\(\((.*?)\)\)/$1/')
+    IFS=","
+    result="${geom_type}(("
+    for coord in $coord_string;do
+        trans_coord=$(echo $coord | cs2cs -f "%.6f" +init=epsg:$input_epsg_code +to +init=epsg:$output_epsg_code)
+        trans_xy=$(echo "$trans_coord" | perl -pe 's/(.*?)\s(.*?)\s.*/$1 $2/')
+        result="${result}${trans_xy},"
+    done
+    result="${result%?}"
+    result="${result}))"
+    echo "$result"
 }
 
-if [[ $INPUT_FILE == "-" ]];then
-# INPUT_FILE passed on stdin
+if [[ $WKT_STRING == "-" ]];then
+# WKT_STRING passed on stdin
     if [ -t 0 ]; then
     # if do not allow interactive tty
         usage
         exit 1
     fi
-    WKT_STRINGS=$(</dev/stdin)
+    while read line
+    do
+        process_wkt_string $EPSG_IN $EPSG_OUT "$line"
+    done < "/dev/stdin"
 else
-    WKT_STRINGS=$(<$INPUT_FILE)
+# BBOX passed as argument 
+    process_wkt_string $EPSG_IN $EPSG_OUT "$WKT_STRING"
 fi
-process_wkt_strings "$WKT_STRINGS" "$INPUT_SRS" "$FORMAT" "$OUTPUT_FILE" "$LAYERNAME"

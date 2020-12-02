@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+PROGRAM_NAME=$(basename $0)
+
+function usage {
+    echo "usage: $PROGRAM_NAME <tilematrix> <zxy>"
+    echo "    - <tilematrix>: valid values: 28992, 3857"
+    echo "    - <zxy>: tile coordinates in the following format \`z/x/ym\`, multiple can be specified"
+    exit 1
+}
+
+if test "$#" -lt 2; then
+    usage
+fi
+
+set -eu
+
+PROJ="$1"
+DEBUG=""
+ZXYS="${@:2}"
+
+RESOLUTIONS_WM=(156543.0339)
+EXTENT_WM=-20037508.342789244,-20037508.342789244,20037508.342789244,20037508.342789244
+
+RESOLUTIONS_RD=(3440.640)
+EXTENT_RD=-285401.920,22598.080,595401.920,903401.920
+
+TILESIZE_PIXELS=256
+
+function get_resolution_for_z(){
+    local proj z resolution
+    proj="$1"
+    z="$2"
+    if [[ $proj == "28992" ]]; then
+        resolution=$RESOLUTIONS_RD
+    elif [[ "$proj" == "3857" ]];then
+        resolution=$RESOLUTIONS_WM
+    fi
+    resolutions_z=$(echo "$resolution*(2^-$z)" | bc -l)
+    echo $resolutions_z
+}
+
+function get_bbox_from_zxy(){
+    local proj resolutions extent z x y origin_x origin_y res tilesize_meters min_x_tile max_x_tile min_y_tile max_y_tile
+    proj="$1"
+    z="$2"
+    x="$3"
+    y="$4"
+
+    if [[ $proj == "28992" ]]; then
+        resolutions=("${RESOLUTIONS_RD[@]}")
+        extent=$EXTENT_RD
+    elif [[ "$proj" == "3857" ]];then
+        resolutions=("${RESOLUTIONS_WM[@]}")
+        
+        extent=$EXTENT_WM
+    fi 
+
+    origin_x=$(echo "$extent" | cut -d, -f1)
+    # tiling schemes uses upperleft corner for origin
+    origin_y=$(echo "$extent" | cut -d, -f4) 
+    res=$(get_resolution_for_z $proj $z)
+    tilesize_meters=$(echo "$res*$TILESIZE_PIXELS" | bc -l)
+    if [[ ! -z $DEBUG ]];then echo $tilesize_meters; fi
+    # see https://unix.stackexchange.com/a/320703; todo: switch to perl for calc
+    min_x_tile=$(echo "($tilesize_meters*$x)+$origin_x" | bc -l | perl -pe '/\./ && s/0+$/$1/ && s/\.$//') 
+    max_y_tile=$(echo "$origin_y-($tilesize_meters*$Y)" | bc -l | perl -pe '/\./ && s/0+$/$1/ && s/\.$//')
+    max_x_tile=$(echo "$min_x_tile+$tilesize_meters" | bc -l | perl -pe '/\./ && s/0+$/$1/ && s/\.$//')
+    min_y_tile=$(echo "$max_y_tile-$tilesize_meters"  | bc -l | perl -pe '/\./ && s/0+$/$1/ && s/\.$//')
+    echo "${min_x_tile},${min_y_tile},${max_x_tile},${max_y_tile}"
+}
+
+for ZXY in $ZXYS;do 
+    Z=$(echo "$ZXY" | cut -d/ -f1)
+    X=$(echo "$ZXY" | cut -d/ -f2)
+    Y=$(echo "$ZXY" | cut -d/ -f3)
+    get_bbox_from_zxy "$PROJ" "$Z" "$X" "$Y"
+done

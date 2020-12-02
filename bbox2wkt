@@ -18,13 +18,13 @@ function process_bbox(){
     local maxx
     local miny
     local maxy
-
+    
     input_string=$1
     if [[ -z $input_string ]];then
         return
     fi
-    
-    IFS=', ' read -r -a array <<< "$input_string"
+    input_string=${input_string// /}
+    IFS=',' read -r -a array <<< "$input_string"
     minx=${array[0]}
     miny=${array[1]}
     maxx=${array[2]}
@@ -32,8 +32,12 @@ function process_bbox(){
     echo "POLYGON(($minx $miny,$minx $maxy,$maxx $maxy,$maxx $miny,$minx $miny))"
 }
 
-BBOX=${1:--}
-if [[ $BBOX == "-" ]];then
+BBOXES="${@}"
+# split string based on regex https://stackoverflow.com/a/45025569
+BBOXES="${BBOXES:--}"
+
+
+if [[ $BBOXES == "-" ]];then
 # BBOX passed on stdin
     if [ -t 0 ]; then
     # if do not allow interactive tty
@@ -41,10 +45,14 @@ if [[ $BBOX == "-" ]];then
         exit 1
     fi
     while read line
-    do
+    do  
         process_bbox "$line"
     done < "/dev/stdin"
 else
-# BBOX passed as argument 
-    process_bbox "$BBOX"
+# BBOX passed as argument
+    IFS=$'\n'
+    for BBOX in $(grep --perl-regexp --only-matching '((-?\d*\.?\d*)\s?,\s?(-?\d*\.?\d*)\s?,\s?(-?\d*\.?\d*)\s?,\s?(-?\d*\.?\d*))\s?'  <<<"$BBOXES");do
+        BBOX="${BBOX//[[:space:]]/}"
+        process_bbox "$BBOX"
+    done
 fi

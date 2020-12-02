@@ -9,7 +9,10 @@
 PROGRAM_NAME=$(basename $0)
 EPSG_IN=$1
 EPSG_OUT=$2
-BBOX=${3:--}
+BBOX="${@:3}"
+BBOX="${BBOX:--}"
+BBOX="${BBOX//[[:space:]]/}" # stripping spaces form BBOX argument
+
 
 PROJ_LIB=/usr/share/proj
 PROJ_DEBUG=0
@@ -21,7 +24,7 @@ function usage {
     exit 1
 }
 
-if test "$#" -ne 3; then
+if [[ "$#" -lt 3 ]]; then
     usage
 fi
 
