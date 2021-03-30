@@ -1,17 +1,12 @@
 #!/usr/bin/env bash
-#
-# Bash script for getting center of bbox
-#
-# Author: anton.bakker@kadaster.nl
-# Date: 28/05/2020
-
 PROGRAM_NAME=$(basename $0)
 BBOX="${@}"
 BBOX="${BBOX:--}"
 BBOX="${BBOX//[[:space:]]/}"
 
-
 function usage {
+    echo "Get center of bounding box. Requires AWK in PATH"
+    echo ""
     echo "usage: $PROGRAM_NAME <bbox|-(bbox on stdin)> "
     echo "    - <bbox>: \$minx,\$miny,\$maxx,\$maxy"
     exit 1
@@ -20,6 +15,8 @@ function usage {
 if test "$#" -lt 1; then
     usage
 fi
+
+set -euo pipefail
 
 function process_bbox(){
     local bbox
@@ -34,9 +31,6 @@ function process_bbox(){
     center_y=$(awk "BEGIN {printf \"%.7f\n\", $y_range_half + $ymin}")
     echo "${center_x} ${center_y}"
 }
-
-
-set -eu
 
 if [[ $BBOX == "-" ]];then
 # BBOX passed on stdin

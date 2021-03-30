@@ -1,23 +1,17 @@
 #!/usr/bin/env bash
-#
-# Bash script for reprojecting bbox string (format: "$minx,$miny,$maxx,$maxy") using cs2cs 
-# from the Proj library (https://proj.org/apps/cs2cs.html)
-#
-# Author: anton.bakker@kadaster.nl
-# Date: 28/05/2020
-
 PROGRAM_NAME=$(basename $0)
 EPSG_IN=$1
 EPSG_OUT=$2
 BBOX="${@:3}"
 BBOX="${BBOX:--}"
-BBOX="${BBOX//[[:space:]]/}" # stripping spaces form BBOX argument
-
+BBOX="${BBOX//[[:space:]]/}" # stripping spaces from BBOX argument
 
 PROJ_LIB=/usr/share/proj
 PROJ_DEBUG=0
 
 function usage {
+    echo "Reproject bounding box string using cs2cs from the Proj library."
+    echo ""
     echo "usage: $PROGRAM_NAME <input_epsg_code> <output_epsg_code> <bbox|-(bbox on stdin)> "
     echo "    - <bbox>: \$minx,\$miny,\$maxx,\$maxy"
     echo "    - <epsg_code>: [0-9]+"
@@ -28,15 +22,16 @@ if [[ "$#" -lt 3 ]]; then
     usage
 fi
 
-set -eu
+set -euo pipefail
 
 function process_bbox(){
     local bbox
     bbox="$1"
-    minx=$(echo $bbox | awk -F, '{print $1}')
-    min_y=$(echo $bbox | awk -F, '{print $2}')
-    max_x=$(echo $bbox | awk -F, '{print $3}')
-    max_y=$(echo $bbox | awk -F, '{print $4}')
+    
+    minx=$(echo "$bbox" | awk -F, '{print $1}')
+    min_y=$(echo "$bbox" | awk -F, '{print $2}')
+    max_x=$(echo "$bbox" | awk -F, '{print $3}')
+    max_y=$(echo "$bbox" | awk -F, '{print $4}')
     min_new=$(echo $minx $min_y | cs2cs -f "%.6f" +init=epsg:$EPSG_IN +to +init=epsg:$EPSG_OUT)
     max_new=$(echo $max_x $max_y | cs2cs -f "%.6f" +init=epsg:$EPSG_IN +to +init=epsg:$EPSG_OUT)
     min_x_new=$(echo $min_new | awk -F' ' '{print $1}')

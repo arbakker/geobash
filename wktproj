@@ -1,11 +1,4 @@
 #!/usr/bin/env bash
-#
-# Bash script for reprojecting bbox string (format: "$minx,$miny,$maxx,$maxy") using cs2cs 
-# from the Proj library (https://proj.org/apps/cs2cs.html)
-#
-# Author: anton.bakker@kadaster.nl
-# Date: 28/05/2020
-
 PROGRAM_NAME=$(basename $0)
 EPSG_IN=$1
 EPSG_OUT=$2
@@ -15,6 +8,8 @@ PROJ_LIB=/usr/share/proj
 PROJ_DEBUG=0
 
 function usage {
+    echo "Reproject WKT string using cs2cs from the Proj library"
+    echo ""
     echo "usage: $PROGRAM_NAME <input_epsg_code> <output_epsg_code> <wkt_string|-(wkt_string on stdin)> "
     echo "    - <wkt_string>: single geometry WKT string"
     echo "    - <epsg_code>: [0-9]+"
@@ -25,7 +20,7 @@ if test "$#" -ne 3; then
     usage
 fi
 
-set -eu
+set -euo pipefail
 
 function process_wkt_string(){
     local wkt_string input_epsg_code output_epsg_code

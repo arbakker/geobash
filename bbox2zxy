@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+PROGRAM_NAME=$(basename $0)
+PROJ="$1"
+Z="$2"
+BBOXS="${@:3}"
+DEBUG=""
+
+function usage {
+    echo "Convert z/x/y tile coordinate to bounding box"
+    echo ""
+    echo "usage: $PROGRAM_NAME <tilematrix> <z> <bbox>"
+    echo "    - <tilematrix>: valid values: 28992, 3857"
+    echo "    - <z>: zoomlevel (int)"
+    echo "    - <bbox|-(bbox objects on stdin>: \$minx,\$miny,\$maxx,\$maxy proj corresponding with tilematrix"
+    exit 1
+}
+
+if test "$#" -lt 3; then
+    usage
+fi
+
+set -euo pipefail
+
+RESOLUTIONS_RD=(3440.640)
+EXTENT_RD=-285401.920,22598.080,595401.920,903401.920
+TILESIZE_PIXELS=256
+
+function get_resolution_for_z(){
+    local proj z resolution
+    proj="$1"
+    z="$2"
+    if [[ $proj == "28992" ]]; then
+        resolution=$RESOLUTIONS_RD
+    elif [[ "$proj" == "3857" ]];then
+        resolution=$RESOLUTIONS_WM
+    fi
+    resolutions_z=$(echo "$resolution*(2^-$z)" | bc -l)
+    echo $resolutions_z
+}
+
+function get_tiles_for_bbox(){
+    # input params
+    local proj z bbox
+    # local variables
+    local proj resolutions extent origin_x origin_y res tilesize_meters min_x_tile max_x_tile min_y_tile max_y_tile
+    
+    proj="$1"
+    z="$2"
+    bbox="$3"
+
+    min_x=$(echo $bbox | awk -F, '{print $1}')
+    min_y=$(echo $bbox | awk -F, '{print $2}')
+    max_x=$(echo $bbox | awk -F, '{print $3}')
+    max_y=$(echo $bbox | awk -F, '{print $4}')
+
+    if [[ $proj == "28992" ]]; then
+        resolutions=("${RESOLUTIONS_RD[@]}")
+        extent=$EXTENT_RD
+    elif [[ "$proj" == "3857" ]];then
+        resolutions=("${RESOLUTIONS_WM[@]}")
+        extent=$EXTENT_WM
+    fi 
+
+    origin_x=$(echo "$extent" | cut -d, -f1)
+    # tiling schemes uses upperleft corner for origin
+    origin_y=$(echo "$extent" | cut -d, -f4) 
+    res=$(get_resolution_for_z $proj $z)
+    tilesize_meters=$(echo "$res*$TILESIZE_PIXELS" | bc -l)
+    if [[ ! -z $DEBUG ]];then echo $tilesize_meters; fi
+
+    # see https://unix.stackexchange.com/a/320703; todo: switch to perl for calc
+    min_x_tile=$(echo "($min_x-($origin_x))/$tilesize_meters" | bc) 
+    max_x_tile=$(echo "($max_x-($origin_x))/$tilesize_meters" | bc) 
+    
+    # tilematrix origin topleft
+    min_y_tile=$(echo "($origin_y-$max_y)/$tilesize_meters" | bc) 
+    max_y_tile=$(echo "($origin_y-$min_y)/$tilesize_meters" | bc) 
+    # echo {$min_x_tile..$max_x_tile}{$min_y_tile..$max_y_tile}
+    # echo "output: $min_x_tile $max_x_tile $min_y_tile $max_y_tile"
+    for x in $(seq $min_x_tile $max_x_tile); do
+        for y in $(seq $min_y_tile $max_y_tile); do
+            echo "${z}/${x}/${y}"
+        done
+    done
+
+}
+
+if [[ $BBOXS == "-" ]];then
+# BBOX passed on stdin
+    if [ -t 0 ]; then
+    # if do not allow interactive tty
+        usage
+    fi
+    while read BBOX
+    do
+        get_tiles_for_bbox "$PROJ" "$Z" "$BBOX" 
+    done < "/dev/stdin"
+else
+    # BBOXS passed as argument
+    for BBOX in $BBOXS;do 
+        get_tiles_for_bbox "$PROJ" "$Z" "$BBOX" 
+    done
+fi
+
+

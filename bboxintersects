@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+PROGRAM_NAME=$(basename $0)
+
+function usage {
+    echo "Intersect list of bounding boxes with input sourde, return only intersecting bounding boxes"
+    echo ""
+    echo "usage: $PROGRAM_NAME <inputsource> <tilematrix> <list of bbox|-(list of bbox on stdin)> "
+    echo "    - <inputsource>: any file OGR/GDAL can read"
+    echo "    - <bbox [bbox]*>: \$minx,\$miny,\$maxx,\$maxy projection same as <inputsource>"
+    exit 1
+}
+
+if test "$#" -lt 2; then
+    usage
+fi
+
+set -euo pipefail
+
+INDEX_FILE="$1"
+BBOXS="${@:2}"
+DEBUG=""
+LAYER=$(ogrinfo -q $INDEX_FILE -so | cut -d " " -f2)
+
+
+if [[ $BBOXS == "-" ]];then
+# BBOX passed on stdin
+    if [ -t 0 ]; then
+    # if do not allow interactive tty
+        usage
+    fi
+    BBOXS=$(</dev/stdin)
+    BBOXS=$(echo $BBOXS | tr '\n' ' ')
+fi
+
+IFS=' ' read -r -a BBOXS_ARRAY <<< "$BBOXS"
+for BBOX in "${BBOXS_ARRAY[@]}";do
+    min_x=$(awk -F, '{print $1}' <<< "$BBOX")
+    min_y=$(awk -F, '{print $2}' <<< "$BBOX")
+    max_x=$(awk -F, '{print $3}' <<< "$BBOX")
+    max_y=$(awk -F, '{print $4}' <<< "$BBOX")
+    output=$(ogrinfo $INDEX_FILE $LAYER -spat "$min_x" "$min_y" "$max_x" "$max_y")    
+    if grep -q "OGRFeature" <<< "$output"; then
+        echo "$BBOX"
+    fi
+done

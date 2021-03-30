@@ -1,28 +1,33 @@
 #!/usr/bin/env bash
-#
-# Bash script for displaying bbox
-#
-# Author: anton.bakker@kadaster.nl
-# Date: 28/05/2020
+PROGRAM_NAME=$(basename $0)
+BBOX="${@}"
+BBOX="${BBOX:--}"
+BBOX="${BBOX//[[:space:]]/}"
 
 function usage {
+    echo "Display bounding box in browser using bboxfinder.com"
+    echo ""
     echo "usage: $PROGRAM_NAME <bbox>"
     echo "  arguments:"
-    echo "  - <bbox>: \$minx,\$miny,\$maxx,\$maxy in EPSG:4326 (arg or stdin)"
+    echo "  - <bbox>: \$minx,\$miny,\$maxx,\$maxy[,\$epsg] default in EPSG:4326 (arg or stdin)"
     exit 1
 }
 
-PROGRAM_NAME=$(basename $0)
-
-set -eu
+set -euo pipefail
 
 function open_url(){
     local bbox min_x max_x min_y max_y url
     bbox=$1
+    epsg_code=$(echo $bbox | awk -F, '{print $5}')
+    
+    if [[ ! -z $epsg_code ]];then
+        bbox=$(echo $bbox | awk -F, '{print $1,$2,$3,$4}' | tr ' ' ',')
+        bbox=$(bboxproj $epsg_code 4326 $bbox)
+    fi
     min_x=$(echo $bbox | awk -F, '{print $1}')
     min_y=$(echo $bbox | awk -F, '{print $2}')
     max_x=$(echo $bbox | awk -F, '{print $3}')
-    max_y=$(echo $bbox | awk -F, '{print $4}')
+    max_y=$(echo $bbox | awk -F, '{print $4}')    
     url="http://bboxfinder.com/#${min_y},${min_x},${max_y},${max_x}"
     if which xdg-open > /dev/null
     then
@@ -32,11 +37,6 @@ function open_url(){
         gnome-open "$url"
     fi
 }
-
-
-BBOX="${@}"
-BBOX="${BBOX:--}"
-BBOX="${BBOX//[[:space:]]/}"
 
 if [[ $BBOX == "-" ]];then
 # BBOX passed on stdin

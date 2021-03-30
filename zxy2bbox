@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 PROGRAM_NAME=$(basename $0)
+PROJ="$1"
+ZXYS="${@:2}"
+DEBUG=""
 
 function usage {
+    echo "Convert z/x/y tilecoordinates to bounding box"
+    echo ""
     echo "usage: $PROGRAM_NAME <tilematrix> <zxy>"
     echo "    - <tilematrix>: valid values: 28992, 3857"
-    echo "    - <zxy>: tile coordinates in the following format \`z/x/ym\`, multiple can be specified"
+    echo "    - <zxy>: tile coordinates in the following format \`z/x/y\`, multiple can be specified"
     exit 1
 }
 
@@ -12,18 +17,12 @@ if test "$#" -lt 2; then
     usage
 fi
 
-set -eu
-
-PROJ="$1"
-DEBUG=""
-ZXYS="${@:2}"
+set -euo pipefail
 
 RESOLUTIONS_WM=(156543.0339)
 EXTENT_WM=-20037508.342789244,-20037508.342789244,20037508.342789244,20037508.342789244
-
 RESOLUTIONS_RD=(3440.640)
 EXTENT_RD=-285401.920,22598.080,595401.920,903401.920
-
 TILESIZE_PIXELS=256
 
 function get_resolution_for_z(){
@@ -69,9 +68,30 @@ function get_bbox_from_zxy(){
     echo "${min_x_tile},${min_y_tile},${max_x_tile},${max_y_tile}"
 }
 
-for ZXY in $ZXYS;do 
-    Z=$(echo "$ZXY" | cut -d/ -f1)
-    X=$(echo "$ZXY" | cut -d/ -f2)
-    Y=$(echo "$ZXY" | cut -d/ -f3)
-    get_bbox_from_zxy "$PROJ" "$Z" "$X" "$Y"
-done
+
+if [[ $ZXYS == "-" ]];then
+# BBOX passed on stdin
+    if [ -t 0 ]; then
+    # if do not allow interactive tty
+        usage
+    fi
+    while read ZXY
+    do
+        Z=$(echo "$ZXY" | cut -d/ -f1)
+        X=$(echo "$ZXY" | cut -d/ -f2)
+        Y=$(echo "$ZXY" | cut -d/ -f3)
+        get_bbox_from_zxy "$PROJ" "$Z" "$X" "$Y"
+    done < "/dev/stdin"
+else
+    # ZXY passed as argument 
+    for ZXY in $ZXYS;do 
+        Z=$(echo "$ZXY" | cut -d/ -f1)
+        X=$(echo "$ZXY" | cut -d/ -f2)
+        Y=$(echo "$ZXY" | cut -d/ -f3)
+        get_bbox_from_zxy "$PROJ" "$Z" "$X" "$Y"
+    done 
+fi
+
+
+
+

@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
+PROGRAM_NAME=$(basename $0)
+WKT_STRING="${@}"
+WKT_STRING="${WKT_STRING:--}"
+
 function usage {
-    echo "description: converts POLYGON and BOX WKT objects to a bounding box string. WKT POLYGON object is required to be rectangular."
+    echo "Converts POLYGON and BOX WKT objects to a bounding box string. WKT POLYGON object is required to be rectangular"
+    echo ""
     echo "usage: $PROGRAM_NAME <wkt_string|-(wkt_string on stdin)>"
     echo "  arguments:"
     echo "  - <wkt_string>: POLYGON or BOX WKT string describing bounding box (arg or stdin)"
     exit 1
 }
 
-PROGRAM_NAME=$(basename $0)
-
 if [ "$#" -lt 1 ]; then
     usage
 fi
 
-set -eu
+set -euo pipefail
 
 function process_wktstring(){
     local input_string
@@ -23,11 +26,7 @@ function process_wktstring(){
     else
         echo "$input_string" | perl -pe 's/BOX\((-?\d+\.?\d*)\s(-?\d+\.?\d*),(-?\d+\.?\d*)\s(-?\d+\.?\d*)\).*$/$1,$2,$3,$4/'
     fi
-    
 }
-
-WKT_STRING="${@}"
-WKT_STRING="${WKT_STRING:--}"
 
 if [[ $WKT_STRING == "-" ]];then
     if [ -t 0 ]; then
