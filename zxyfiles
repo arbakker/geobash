@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+PROGRAM_NAME=$(basename $0)
+
+function usage {
+    echo "usage: $PROGRAM_NAME <z>"
+    echo "    - <z>: zoomlevel"
+    exit 1
+}
+
+if test "$#" -lt 1; then
+    usage
+fi
+
+set -eu
+
+DEBUG=""
+Z="$1"
+RESOLUTIONS_RD=(3440.640)
+EXTENT_RD=-285401.920,22598.080,595401.920,903401.920
+TILESIZE_PIXELS=256
+
+function get_resolution_for_z(){
+    local z resolution resolution_z
+    z="$1"
+    resolution=$RESOLUTIONS_RD
+    resolution_z=$(echo "$resolution*(2^-$z)" | bc -l)
+    echo $resolution_z
+}
+
+function get_files_for_z(){
+    local resolution_z extent z x y origin_x origin_y res tilesize_meters min_x_tile max_x_tile min_y_tile max_y_tile
+    z="$1"
+    resolution_z=$(get_resolution_for_z $z)
+
+    x=0
+    while true;do
+        y=0
+        while true; do
+            echo "${z}/${x}/${y}.pbf"
+            y=$((y+1))
+            # check if y coord is still within proj extent based on y
+            height=$(echo "$TILESIZE_PIXELS*$y*$resolution_z" | bc -l)
+            origin_y=$(echo $EXTENT_RD | cut -d "," -f4)
+            end_y=$(echo $EXTENT_RD | cut -d "," -f2)
+            current_y=$(echo "$origin_y-$height" | bc -l)
+            if  (( $(echo "$current_y < $end_y" |bc -l) ));then
+                break
+            fi
+        done
+        x=$((x+1))
+        # check if x coord is still within proj extent based on x
+        width=$(echo "$TILESIZE_PIXELS*$x*$resolution_z" | bc -l)
+        origin_x=$(echo $EXTENT_RD | cut -d "," -f1)
+        end_x=$(echo $EXTENT_RD | cut -d "," -f3)
+        current_x=$(echo "$width+$origin_x" | bc -l)
+        if (( $(echo "$current_x > $end_x" |bc -l) ));then
+            break
+        fi
+    done
+}
+
+
+get_files_for_z "$Z"
