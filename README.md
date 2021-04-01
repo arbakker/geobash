@@ -4,6 +4,16 @@ Collection of bash scripts to inspect and reproject coordinates, bounding boxes 
 
 Most scripts allow to pass the input geometry (bbox, coordinate or wkt string) to be passed on standard input. When passing geometry on standard input replace the input geometry argument with `-`.
 
+## Requirements
+
+Requires `libproj-dev`, `gdal-bin`  and `perl` to be installed. 
+
+Add directory to PATH (add to `.bashrc` or `.zshrc`):
+
+```
+export PATH=${geobash_installation_path}:$PATH
+```
+
 ## Usage examples
 
 ### create GPKG with all tiles of z3 of Dutch tiling scheme (EPSG:28992)
