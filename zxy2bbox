@@ -5,7 +5,7 @@ ZXYS="${@:2}"
 DEBUG=""
 
 function usage {
-    echo "Convert z/x/y tilecoordinates to bounding box with ESPG code"
+    echo "Convert z/x/y tilecoordinates to bounding box with ESPG code."
     echo "EPSG code can be stripped with \`cut -d, -f1,2,3,4\`"
     echo ""
     echo "usage: $PROGRAM_NAME <tilematrix> <zxy>"
