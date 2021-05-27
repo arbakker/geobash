@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-PROGRAM_NAME=$(basename $0)
+PROGRAM_NAME=$(basename "$0")
 PROJ="$1"
 ZXYS="${@:2}"
 DEBUG=""
 
 function usage {
-    echo "Convert z/x/y tilecoordinates to bounding box"
+    echo "Convert z/x/y tilecoordinates to bounding box with ESPG code"
+    echo "EPSG code can be stripped with \`cut -d, -f1,2,3,4\`"
     echo ""
     echo "usage: $PROGRAM_NAME <tilematrix> <zxy>"
     echo "    - <tilematrix>: valid values: 28992, 3857"
@@ -19,79 +20,69 @@ fi
 
 set -euo pipefail
 
-RESOLUTIONS_WM=(156543.0339)
+RESOLUTIONS_WM_0=156543.0339
 EXTENT_WM=-20037508.342789244,-20037508.342789244,20037508.342789244,20037508.342789244
-RESOLUTIONS_RD=(3440.640)
+RESOLUTION_RD_0=3440.640
 EXTENT_RD=-285401.920,22598.080,595401.920,903401.920
 TILESIZE_PIXELS=256
 
-function get_resolution_for_z(){
+function get_resolution_for_z() {
     local proj z resolution
     proj="$1"
     z="$2"
     if [[ $proj == "28992" ]]; then
-        resolution=$RESOLUTIONS_RD
-    elif [[ "$proj" == "3857" ]];then
-        resolution=$RESOLUTIONS_WM
+        resolution=$RESOLUTION_RD_0
+    elif [[ "$proj" == "3857" ]]; then
+        resolution=$RESOLUTIONS_WM_0
     fi
     resolutions_z=$(echo "$resolution*(2^-$z)" | bc -l)
-    echo $resolutions_z
+    echo "$resolutions_z"
 }
 
-function get_bbox_from_zxy(){
-    local proj resolutions extent z x y origin_x origin_y res tilesize_meters min_x_tile max_x_tile min_y_tile max_y_tile
+function get_bbox_from_zxy() {
+    local proj extent z x y origin_x origin_y res tilesize_meters min_x_tile max_x_tile min_y_tile max_y_tile
     proj="$1"
     z="$2"
     x="$3"
     y="$4"
 
     if [[ $proj == "28992" ]]; then
-        resolutions=("${RESOLUTIONS_RD[@]}")
         extent=$EXTENT_RD
-    elif [[ "$proj" == "3857" ]];then
-        resolutions=("${RESOLUTIONS_WM[@]}")
-        
+    elif [[ "$proj" == "3857" ]]; then
         extent=$EXTENT_WM
-    fi 
-
+    fi
     origin_x=$(echo "$extent" | cut -d, -f1)
     # tiling schemes uses upperleft corner for origin
-    origin_y=$(echo "$extent" | cut -d, -f4) 
-    res=$(get_resolution_for_z $proj $z)
+    origin_y=$(echo "$extent" | cut -d, -f4)
+    res=$(get_resolution_for_z "$proj" "$z")
     tilesize_meters=$(echo "$res*$TILESIZE_PIXELS" | bc -l)
-    if [[ ! -z $DEBUG ]];then echo $tilesize_meters; fi
+    if [[ -n $DEBUG ]]; then echo "$tilesize_meters"; fi
     # see https://unix.stackexchange.com/a/320703; todo: switch to perl for calc
-    min_x_tile=$(echo "($tilesize_meters*$x)+$origin_x" | bc -l | perl -pe '/\./ && s/0+$/$1/ && s/\.$//') 
-    max_y_tile=$(echo "$origin_y-($tilesize_meters*$Y)" | bc -l | perl -pe '/\./ && s/0+$/$1/ && s/\.$//')
+    min_x_tile=$(echo "($tilesize_meters*$x)+$origin_x" | bc -l | perl -pe '/\./ && s/0+$/$1/ && s/\.$//')
+    max_y_tile=$(echo "$origin_y-($tilesize_meters*$y)" | bc -l | perl -pe '/\./ && s/0+$/$1/ && s/\.$//')
     max_x_tile=$(echo "$min_x_tile+$tilesize_meters" | bc -l | perl -pe '/\./ && s/0+$/$1/ && s/\.$//')
-    min_y_tile=$(echo "$max_y_tile-$tilesize_meters"  | bc -l | perl -pe '/\./ && s/0+$/$1/ && s/\.$//')
-    echo "${min_x_tile},${min_y_tile},${max_x_tile},${max_y_tile}"
+    min_y_tile=$(echo "$max_y_tile-$tilesize_meters" | bc -l | perl -pe '/\./ && s/0+$/$1/ && s/\.$//')
+    echo "${min_x_tile},${min_y_tile},${max_x_tile},${max_y_tile},${proj}"
 }
 
-
-if [[ $ZXYS == "-" ]];then
-# BBOX passed on stdin
+if [[ $ZXYS == "-" ]]; then
+    # BBOX passed on stdin
     if [ -t 0 ]; then
-    # if do not allow interactive tty
+        # if do not allow interactive tty
         usage
     fi
-    while read ZXY
-    do
+    while read -r ZXY; do
         Z=$(echo "$ZXY" | cut -d/ -f1)
         X=$(echo "$ZXY" | cut -d/ -f2)
         Y=$(echo "$ZXY" | cut -d/ -f3)
         get_bbox_from_zxy "$PROJ" "$Z" "$X" "$Y"
-    done < "/dev/stdin"
+    done <"/dev/stdin"
 else
-    # ZXY passed as argument 
-    for ZXY in $ZXYS;do 
+    # ZXY passed as argument
+    for ZXY in $ZXYS; do
         Z=$(echo "$ZXY" | cut -d/ -f1)
         X=$(echo "$ZXY" | cut -d/ -f2)
         Y=$(echo "$ZXY" | cut -d/ -f3)
         get_bbox_from_zxy "$PROJ" "$Z" "$X" "$Y"
-    done 
+    done
 fi
-
-
-
-
