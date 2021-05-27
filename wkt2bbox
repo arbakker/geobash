@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-PROGRAM_NAME=$(basename $0)
+PROGRAM_NAME=$(basename "$0")
 WKT_STRING="${@}"
 WKT_STRING="${WKT_STRING:--}"
 
@@ -18,26 +18,26 @@ fi
 
 set -euo pipefail
 
-function process_wktstring(){
+function process_wktstring() {
     local input_string
-    input_string=$1
-    if [[ $input_string == *POLYGON ]];then
-        echo "$input_string" | perl -pe 's/POLYGON\s?\(\((-?\d+\.?\d*)\s(-?\d+\.?\d*),.*?,(-?\d+\.?\d*)\s(-?\d+\.?\d*).*$/$1,$2,$3,$4/'
+    input_string="$1"
+
+    if [[ "$input_string" == *POLYGON* ]]; then
+        echo "$input_string" | perl -pe 's/POLYGON\s?\(\((-?\d+\.?\d*)\s(-?\d+\.?\d*),-?\d+\.?\d*\s-?\d+\.?\d*,(-?\d+\.?\d*)\s(-?\d+\.?\d*),.*$/$1,$2,$3,$4/'
     else
         echo "$input_string" | perl -pe 's/BOX\((-?\d+\.?\d*)\s(-?\d+\.?\d*),(-?\d+\.?\d*)\s(-?\d+\.?\d*)\).*$/$1,$2,$3,$4/'
     fi
 }
 
-if [[ $WKT_STRING == "-" ]];then
+if [[ $WKT_STRING == "-" ]]; then
     if [ -t 0 ]; then
-    # if do not allow interactive tty
+        # if do not allow interactive tty
         usage
         exit 1
     fi
-    while read line
-    do
+    while read -r line; do
         process_wktstring "$line"
-    done < "/dev/stdin"
+    done <"/dev/stdin"
 else
     process_wktstring "$WKT_STRING"
 fi
