@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+PROGRAM_NAME=$(basename "$0")
+URL="$1"
+
+function usage {
+    echo "Calculate the scale denominator of a WMS GetMap request."
+    echo "When no DPI parameter provided in the URL (e.g. \`DPI=92\`), "
+    echo "the script assumes a default DPI value of 90.71446714322."    
+    echo ""
+    echo "usage: $PROGRAM_NAME <getmap_url> "
+    echo "    - <getmap_url>: WMS GetMap request URL"
+    exit 1
+}
+
+function urldecode() {
+    : "${*//+/ }"
+    echo -e "${_//%/\\x}"
+}
+
+if test "$#" -ne 1; then
+    usage
+fi
+
+if ! [[ $URL = \http://*  || $URL = \https://* ]];then
+    usage
+fi
+
+set -euo pipefail
+
+URL="$(urldecode "$URL")"
+QUERY_STRING=$(cut -d? -f2 <<<"$URL")
+declare -A param
+
+while IFS='=' read -r -d '&' key value && [[ -n "$key" ]]; do
+    param["$key"]=$value
+done <<<"${QUERY_STRING}&"
+
+BBOX=${param[BBOX]}
+IMAGE_WIDTH=${param[WIDTH]}
+MIN_X=$(cut -d, -f1 <<<"$BBOX")
+MAX_X=$(cut -d, -f3 <<<"$BBOX")
+DELTA_X=$(bc <<<"$MAX_X-$MIN_X")
+
+if [ ${param[DPI]+_} ]; then
+    DPI=${param[DPI]}
+else
+    echo "NO DPI query param found, using default value for DPI: 90.71446714322"
+    DPI="90.71446714322"
+fi
+
+# SCALE: "1:${SCALEDENOMINATOR}"
+# SCALEDENOMINATOR = $REALWORLD_DISTANCE/$SCREEN_DISTANCE
+SCREEN_DISTANCE=$(bc -l <<<"(((${IMAGE_WIDTH}/${DPI})*2.54)/100)")
+SCALEDENOMINATOR=$(bc -l <<<"${DELTA_X}/${SCREEN_DISTANCE}")
+echo "${SCALEDENOMINATOR}"
