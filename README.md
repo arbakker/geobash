@@ -1,5 +1,7 @@
 # README
 
+![Shellcheck](https://github.com/arbakker/geobash/actions/workflows/shellcheck.yml/badge.svg)
+
 Collection of bash scripts to inspect and reproject coordinates, bounding boxes and WKT strings.
 
 Most scripts allow to pass the input geometry (bbox, coordinate or wkt string) to be passed on standard input. When passing geometry on standard input replace the input geometry argument with `-`.
