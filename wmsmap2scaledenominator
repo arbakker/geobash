@@ -22,6 +22,7 @@ if test "$#" -ne 1; then
     usage
 fi
 
+# shellcheck disable=SC1001
 if ! [[ $URL = \http://*  || $URL = \https://* ]];then
     usage
 fi
@@ -53,4 +54,4 @@ fi
 # SCALEDENOMINATOR = $REALWORLD_DISTANCE/$SCREEN_DISTANCE
 SCREEN_DISTANCE=$(bc -l <<<"(((${IMAGE_WIDTH}/${DPI})*2.54)/100)")
 SCALEDENOMINATOR=$(bc -l <<<"${DELTA_X}/${SCREEN_DISTANCE}")
-echo "${SCALEDENOMINATOR}"
+echo "${SCALEDENOMINATOR}" | xargs printf "%.2f"

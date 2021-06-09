@@ -30,11 +30,11 @@ function open_url(){
     max_x=$(echo "$bbox" | awk -F, '{print $3}')
     max_y=$(echo "$bbox" | awk -F, '{print $4}')    
     url="http://bboxfinder.com/#${min_y},${min_x},${max_y},${max_x}"
-    if which xdg-open > /dev/null
-    then
+    
+    echo "$url"
+    if command -v xdg-open &> /dev/null;then
         xdg-open "$url"
-    elif which gnome-open > /dev/null
-    then
+    elif command -v gnome-open &> /dev/null;then
         gnome-open "$url"
     fi
 }
