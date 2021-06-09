@@ -1,6 +1,6 @@
 # README
 
-![Shellcheck](https://github.com/acmesh-official/acme.sh/workflows/Shellcheck/badge.svg)
+![Shellcheck](https://github.com/arbakker/geobash/actions/workflows/shellcheck.yml/badge.svg)
 
 Collection of bash scripts to inspect and reproject coordinates, bounding boxes and WKT strings.
 
