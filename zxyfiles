@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-PROGRAM_NAME=$(basename $0)
+PROGRAM_NAME=$(basename "$0")
 
 function usage {
+    echo "Generate list of tiles per zoomlevel (only EPSG:28992)" 
     echo "usage: $PROGRAM_NAME <z>"
     echo "    - <z>: zoomlevel"
     exit 1
@@ -13,25 +14,23 @@ fi
 
 set -eu
 
-DEBUG=""
 Z="$1"
-RESOLUTIONS_RD=(3440.640)
+RESOLUTIONS_RD_0=3440.640
 EXTENT_RD=-285401.920,22598.080,595401.920,903401.920
 TILESIZE_PIXELS=256
 
 function get_resolution_for_z(){
     local z resolution resolution_z
     z="$1"
-    resolution=$RESOLUTIONS_RD
+    resolution=$RESOLUTIONS_RD_0
     resolution_z=$(echo "$resolution*(2^-$z)" | bc -l)
-    echo $resolution_z
+    echo "$resolution_z"
 }
 
 function get_files_for_z(){
-    local resolution_z extent z x y origin_x origin_y res tilesize_meters min_x_tile max_x_tile min_y_tile max_y_tile
+    local resolution_z z x y origin_x origin_y
     z="$1"
-    resolution_z=$(get_resolution_for_z $z)
-
+    resolution_z=$(get_resolution_for_z "$z")
     x=0
     while true;do
         y=0
@@ -57,7 +56,6 @@ function get_files_for_z(){
             break
         fi
     done
+
 }
-
-
 get_files_for_z "$Z"

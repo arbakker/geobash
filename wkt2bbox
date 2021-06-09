@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 PROGRAM_NAME=$(basename "$0")
+# shellcheck disable=SC2124
 WKT_STRING="${@}"
 WKT_STRING="${WKT_STRING:--}"
 

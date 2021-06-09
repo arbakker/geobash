@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-PROGRAM_NAME=$(basename $0)
+PROGRAM_NAME=$(basename "$0")
 INPUT_FILE=${1:--}
 INPUT_SRS=${2}
 FORMAT=${3}
@@ -52,8 +52,8 @@ function process_wkt_strings(){
     VRT_STRING=${VRT_STRING/\{\{input_srs\}\}/$SRS_WKT}
     echo "$VRT_STRING" > /tmp/ogr.vrt
     rm -f "$output_file"
-    ogr2ogr -f "$format" "/tmp/$(basename $output_file)" /tmp/ogr.vrt -nln "$layername" wkt_convert
-    ogr2ogr -f "$format" "$output_file" "/tmp/$(basename $output_file)" -sql "select geom from $layername" -nln "$layername"
+    ogr2ogr -f "$format" "/tmp/$(basename "$output_file")" /tmp/ogr.vrt -nln "$layername" wkt_convert
+    ogr2ogr -f "$format" "$output_file" "/tmp/$(basename "$output_file")" -sql "select geom from $layername" -nln "$layername"
 }
 
 if [[ $INPUT_FILE == "-" ]];then
@@ -65,6 +65,6 @@ if [[ $INPUT_FILE == "-" ]];then
     fi
     WKT_STRINGS=$(</dev/stdin)
 else
-    WKT_STRINGS=$(<$INPUT_FILE)
+    WKT_STRINGS=$(<"$INPUT_FILE")
 fi
 process_wkt_strings "$WKT_STRINGS" "$INPUT_SRS" "$FORMAT" "$OUTPUT_FILE" "$LAYERNAME"

@@ -1,11 +1,8 @@
 #!/usr/bin/env bash
-PROGRAM_NAME=$(basename $0)
+PROGRAM_NAME=$(basename "$0")
 EPSG_IN=$1
 EPSG_OUT=$2
 WKT_STRING=${3:--}
-
-PROJ_LIB=/usr/share/proj
-PROJ_DEBUG=0
 
 function usage {
     echo "Reproject WKT string using cs2cs from the Proj library"
@@ -32,7 +29,7 @@ function process_wkt_string(){
     IFS=","
     result="${geom_type}(("
     for coord in $coord_string;do
-        trans_coord=$(echo $coord | cs2cs -f "%.6f" +init=epsg:$input_epsg_code +to +init=epsg:$output_epsg_code)
+        trans_coord=$(echo "$coord" | cs2cs -f "%.6f" "+init=epsg:$input_epsg_code" +to "+init=epsg:$output_epsg_code")
         trans_xy=$(echo "$trans_coord" | perl -pe 's/(.*?)\s(.*?)\s.*/$1 $2/')
         result="${result}${trans_xy},"
     done
@@ -48,11 +45,11 @@ if [[ $WKT_STRING == "-" ]];then
         usage
         exit 1
     fi
-    while read line
+    while read -r line
     do
-        process_wkt_string $EPSG_IN $EPSG_OUT "$line"
+        process_wkt_string "$EPSG_IN" "$EPSG_OUT" "$line"
     done < "/dev/stdin"
 else
 # BBOX passed as argument 
-    process_wkt_string $EPSG_IN $EPSG_OUT "$WKT_STRING"
+    process_wkt_string "$EPSG_IN" "$EPSG_OUT" "$WKT_STRING"
 fi

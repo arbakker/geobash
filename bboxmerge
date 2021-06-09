@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-PROGRAM_NAME=$(basename $0)
+PROGRAM_NAME=$(basename "$0")
 
 function usage {
     echo "Merge (union) multiple bounding boxes into a single bounding box"
@@ -15,31 +15,31 @@ fi
 
 set -euo pipefail
 
+# shellcheck disable=SC2124
 BBOXS="${@:1}"
-DEBUG=""
 
 function get_min(){
     local i="$1"   # Save first argument in a variable
     shift            # Shift all arguments to the left (original $1 gets lost)
     local vector=("$@") # Rebuild the array with rest of arguments
-    min=$(echo ${vector[0]} | awk -F, "{print \$$i}")
+    min=$(echo "${vector[0]}" | awk -F, "{print \$$i}")
     for bbox in "${vector[@]}"; do
-        val=$(echo $bbox | awk -F, "{print \$$i}")
+        val=$(echo "$bbox" | awk -F, "{print \$$i}")
         (( $(echo "$val < $min" | bc -l) )) && min=$val
     done
-    echo $min
+    echo "$min"
 }
 
 function get_max(){
     local i="$1"   # Save first argument in a variable
     shift            # Shift all arguments to the left (original $1 gets lost)
     local vector=("$@") # Rebuild the array with rest of arguments
-    max=$(echo ${vector[0]} | awk -F, "{print \$$i}")
+    max=$(echo "${vector[0]}" | awk -F, "{print \$$i}")
     for bbox in "${vector[@]}"; do
-        val=$(echo $bbox | awk -F, "{print \$$i}")
+        val=$(echo "$bbox" | awk -F, "{print \$$i}")
         (( $(echo "$val > $max" | bc -l) )) && max=$val
     done
-    echo $max
+    echo "$max"
 }
 
 if [[ $BBOXS == "-" ]];then
@@ -49,7 +49,7 @@ if [[ $BBOXS == "-" ]];then
         usage
     fi
     BBOXS=$(</dev/stdin)
-    BBOXS=$(echo $BBOXS | tr '\r\n' ' ')
+    BBOXS=$(echo "$BBOXS" | tr '\r\n' ' ')
 fi
 
 IFS=' ' read -r -a BBOXS_ARRAY <<< "$BBOXS"
@@ -58,5 +58,3 @@ min_y=$(get_max "2" "${BBOXS_ARRAY[@]}")
 max_x=$(get_max "3" "${BBOXS_ARRAY[@]}")
 max_y=$(get_max "4" "${BBOXS_ARRAY[@]}")
 echo "${min_x},${min_y},${max_x},${max_y}"
-
-

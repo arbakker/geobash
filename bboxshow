@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-PROGRAM_NAME=$(basename $0)
+PROGRAM_NAME=$(basename "$0")
+# shellcheck disable=SC2124
 BBOX="${@}"
 BBOX="${BBOX:--}"
 BBOX="${BBOX//[[:space:]]/}"
@@ -18,16 +19,16 @@ set -euo pipefail
 function open_url(){
     local bbox min_x max_x min_y max_y url
     bbox=$1
-    epsg_code=$(echo $bbox | awk -F, '{print $5}')
+    epsg_code=$(echo "$bbox" | awk -F, '{print $5}')
     
-    if [[ ! -z $epsg_code ]];then
-        bbox=$(echo $bbox | awk -F, '{print $1,$2,$3,$4}' | tr ' ' ',')
-        bbox=$(bboxproj $epsg_code 4326 $bbox)
+    if [[ -n $epsg_code ]];then
+        bbox=$(echo "$bbox" | awk -F, '{print $1,$2,$3,$4}' | tr ' ' ',')
+        bbox=$(bboxproj "$epsg_code" 4326 "$bbox")
     fi
-    min_x=$(echo $bbox | awk -F, '{print $1}')
-    min_y=$(echo $bbox | awk -F, '{print $2}')
-    max_x=$(echo $bbox | awk -F, '{print $3}')
-    max_y=$(echo $bbox | awk -F, '{print $4}')    
+    min_x=$(echo "$bbox" | awk -F, '{print $1}')
+    min_y=$(echo "$bbox" | awk -F, '{print $2}')
+    max_x=$(echo "$bbox" | awk -F, '{print $3}')
+    max_y=$(echo "$bbox" | awk -F, '{print $4}')    
     url="http://bboxfinder.com/#${min_y},${min_x},${max_y},${max_x}"
     if which xdg-open > /dev/null
     then
@@ -45,7 +46,7 @@ if [[ $BBOX == "-" ]];then
         usage
         exit 1
     fi
-    while read line
+    while read -r line
     do
         open_url "$line"
     done < "/dev/stdin"
