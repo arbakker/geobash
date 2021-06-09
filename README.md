@@ -22,7 +22,7 @@ Source files are linted with [Shellcheck](https://github.com/koalaman/shellcheck
 
 ## Usage examples
 
-Create GPKG with geometries of all tiles of zoomlevel 3 (nr of tiles per zoomlevel is 2^z and starts at 0) of Dutch tiling scheme (EPSG:28992):
+Create GPKG with geometries of all tiles of zoomlevel 3 (nr of tiles per zoomlevel is 2^z, zoomlevel z is zero-based index) of Dutch tiling scheme (EPSG:28992):
 
 ```
 zxy2bbox 28992 4/{0..15}/{0..15}  | bbox2wkt | wkt2ogr -  28992 GPKG grid.gpkg grid
