@@ -12,8 +12,9 @@ function usage {
     exit 1
 }
 
-function urldecode() {
-    : "${*//+/ }"
+# see https://stackoverflow.com/a/37840948
+function urldecode() { 
+    : "${*//+/ }" 
     echo -e "${_//%/\\x}"
 }
 
