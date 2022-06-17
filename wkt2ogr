@@ -34,32 +34,33 @@ VRT_STRING="<OGRVRTDataSource>
 </OGRVRTDataSource>"
 CSV_FILE="/tmp/wkt_convert.csv"
 
-function process_wkt_strings(){
+function process_wkt_strings() {
     local wkt_strings format output_file layername input_srs
     wkt_strings="$1"
     input_srs="$2"
     format="$3"
     output_file="$4"
     layername="$5"
-    echo "id,wkt" > $CSV_FILE
+    echo "id,wkt" >$CSV_FILE
     i=0
     while IFS= read -r wkt_string; do
-        echo "$i,\"$wkt_string\"" >> $CSV_FILE
-        i=$((i+1))
-    done <<< "$wkt_strings"
-    SRS_WKT=$(gdalsrsinfo  "EPSG:$input_srs" -o WKT)
+        echo "$i,\"$wkt_string\"" >>$CSV_FILE
+        i=$((i + 1))
+    done <<<"$wkt_strings"
+    SRS_WKT=$(gdalsrsinfo "EPSG:$input_srs" -o WKT)
     SRS_WKT=${SRS_WKT/\"/\\\"}
     VRT_STRING=${VRT_STRING/\{\{input_srs\}\}/$SRS_WKT}
-    echo "$VRT_STRING" > /tmp/ogr.vrt
+    echo "$VRT_STRING" >/tmp/ogr.vrt
     rm -f "$output_file"
-    ogr2ogr -f "$format" "/tmp/$(basename "$output_file")" /tmp/ogr.vrt -nln "$layername" wkt_convert
-    ogr2ogr -f "$format" "$output_file" "/tmp/$(basename "$output_file")" -sql "select geom from $layername" -nln "$layername"
+    tmp_name="/tmp/$(uuidgen)-($(basename "$output_file")"
+    ogr2ogr -f "$format" "$tmp_name" /tmp/ogr.vrt -nln "$layername" wkt_convert
+    ogr2ogr -f "$format" "$output_file" "$tmp_name" -sql "select geom from $layername" -nln "$layername"
 }
 
-if [[ $INPUT_FILE == "-" ]];then
-# INPUT_FILE passed on stdin
+if [[ $INPUT_FILE == "-" ]]; then
+    # INPUT_FILE passed on stdin
     if [ -t 0 ]; then
-    # if do not allow interactive tty
+        # if do not allow interactive tty
         usage
         exit 1
     fi
