@@ -7,7 +7,7 @@ BBOXS="${@:3}"
 DEBUG=""
 
 function usage {
-    echo "Convert z/x/y tile coordinate to bounding box"
+    echo "Convert bounding box and z to z/x/y tile coordinate"
     echo ""
     echo "usage: $PROGRAM_NAME <tilematrix> <z> <bbox>"
     echo "    - <tilematrix>: valid values: 28992, 3857"
