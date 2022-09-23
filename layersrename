@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+PROGRAM_NAME=$(basename "$0")
+
+function usage {
+    echo "Batch rename layers in multilayer OGR file (GPKG, PostGIS)" 
+    echo "usage: $PROGRAM_NAME <ogr-file> <rename-pattern> [dry-run]"
+    echo "    - <ogr-file>: path to OGR file or connection string"
+    echo "    - <rename-pattern>: rename layers according to sed extended regex pattern, "
+    echo "      for example to replace \"string_to_replace\" with \"\": 's|string_to_replace||g'"
+    echo "    - [dry-run]: dry run, defaults to true, to actually rename layers set to false"
+    exit 1
+}
+
+if test "$#" -lt 3; then
+    usage
+fi
+
+set -eu
+
+function rename_layers(){
+    input_gpkg="$1"
+    sed_pattern="$2"
+    layers=$(ogrinfo "$input_gpkg" | tail -n+3 | cut -d" " -f2)
+    for layername in $layers;do
+        new_layername=$(sed -E "$sed_pattern" <<< "$layername")
+        message="> renaming layer $layername to ${new_layername}"
+        if [[ $DRY_RUN == "true" ]];then
+            message="${message} - DRY_RUN"
+            echo "$message"
+            continue    
+        fi
+        echo "$message"
+        ogr2ogr -update "$input_gpkg" "$input_gpkg" "$layername" -nln "$new_layername"
+        ogrinfo "$input_gpkg" -sql "DROP TABLE ${layername}" > /dev/null
+    done
+}
+
+INPUT_GPKG="$1"
+SED_PATTERN="$2" # for example to replace "string_to_replace" with "": 's|string_to_replace||g'
+DRY_RUN="${3:-true}"
+rename_layers "$INPUT_GPKG" "$SED_PATTERN"
+
