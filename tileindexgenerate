@@ -12,7 +12,7 @@ GPKG_OUTPUT_FILE="$3"
 LAYER_NAME="${4:-tileindex}"
 TILE_ID_FIELD_NAME="${5:-tile_identifier}"
 
-CSV_OUTPUT_FILE=$(mktemp --suffix=.csv)
+CSV_OUTPUT_FILE=$(mktemp /tmp/bladindex_XXXXXX.csv) # prefix bladindex_ is important otherwise cannot be used as layer identifier in ogr2ogr
 
 function usage {
     echo "Generate GeoPackage tileindex for list of raster files"
@@ -52,7 +52,9 @@ function main() {
     export PERL_REPLACE_REGEX
     echo '"WKT","'"$TILE_ID_FIELD_NAME"'"' >"$CSV_OUTPUT_FILE"
     parallel -j20 'generate_csv_line {}' <"$RASTERS_LIST_FILE"
-    ogr2ogr -f GPKG "$GPKG_OUTPUT_FILE" "$CSV_OUTPUT_FILE" -a_srs "EPSG:28992" -nln "$LAYER_NAME"
+    filename=$(basename "$CSV_OUTPUT_FILE")
+    layername="${filename%.*}"
+    ogr2ogr -f GPKG "$GPKG_OUTPUT_FILE" "$CSV_OUTPUT_FILE" -sql "select ${TILE_ID_FIELD_NAME} from ${layername}" -a_srs "EPSG:28992" -nln "$LAYER_NAME"
     echo "generated bladindex in: ${GPKG_OUTPUT_FILE}"
 }
 
