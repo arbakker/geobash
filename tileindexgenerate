@@ -9,17 +9,22 @@ PROGRAM_NAME=$(basename "$0")
 RASTERS_LIST_FILE="$1"  # create RASTERS_LIST_FILE for instance with: RASTERS_LIST_FILE=$(mktemp);rclone lsf -R my_storage_account:$tif_path --include="*.tif" | xargs printf "/vsicurl/https://my_storage_account.blob.core.windows.net/$tif_path/%s\n" > $RASTERS_LIST_FILE;
 PERL_REPLACE_REGEX="$2" # Perl regex replace pattern to extract bladnummer from filename 's|^M_(.*)\.tif$|\1|'
 GPKG_OUTPUT_FILE="$3"
+LAYER_NAME="${4:-tileindex}"
+TILE_ID_FIELD_NAME="${5:-tile_identifier}"
 
 CSV_OUTPUT_FILE=$(mktemp --suffix=.csv)
 
 function usage {
     echo "Generate GeoPackage tileindex for list of raster files"
     echo ""
-    echo "usage: $PROGRAM_NAME <rasters_list_file> <perl_replace_regex> <gpkg_output> "
+    echo "usage: $PROGRAM_NAME <rasters_list_file> <perl_replace_regex> <gpkg_output> <layername=tileindex> <tile_id_field_name=tile_identifier>"
     echo "    - <rasters_list_file>: file containing filepaths to raster files (can be /vsicurl urls)"
     # shellcheck disable=SC2028
     echo "    - <perl_replace_regex>: perl regex replace pattern to extract index identifier from filename, for instance: 's|^M_(.*)\.tif$|\1|'"
     echo "    - <gpkg_output>: GeoPackage output filepath"
+    echo "    - <layername>: Name of tileindex layer in output GeoPackage"
+    echo "    - <tile_id_field_name>: field name ot tile identifier in tileindex layer"
+
     exit 1
 }
 
@@ -45,9 +50,9 @@ function main() {
     export -f generate_csv_line
     export CSV_OUTPUT_FILE
     export PERL_REPLACE_REGEX
-    echo '"WKT","bladnr"' >"$CSV_OUTPUT_FILE"
+    echo '"WKT","'"$TILE_ID_FIELD_NAME"'"' >"$CSV_OUTPUT_FILE"
     parallel -j20 'generate_csv_line {}' <"$RASTERS_LIST_FILE"
-    ogr2ogr -f GPKG "$GPKG_OUTPUT_FILE" "$CSV_OUTPUT_FILE" -a_srs "EPSG:28992" -nln bladindex
+    ogr2ogr -f GPKG "$GPKG_OUTPUT_FILE" "$CSV_OUTPUT_FILE" -a_srs "EPSG:28992" -nln "$LAYER_NAME"
     echo "generated bladindex in: ${GPKG_OUTPUT_FILE}"
 }
 
