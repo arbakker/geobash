@@ -62,7 +62,6 @@ if [[ $INPUT_FILE == "-" ]]; then
     if [ -t 0 ]; then
         # if do not allow interactive tty
         usage
-        exit 1
     fi
     WKT_STRINGS=$(</dev/stdin)
 else

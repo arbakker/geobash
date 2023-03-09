@@ -15,7 +15,7 @@ function usage {
 
 set -euo pipefail
 
-function process_bbox(){
+function process_bbox() {
     local input_string
     local array
     local minx
@@ -23,11 +23,11 @@ function process_bbox(){
     local miny
     local maxy
     input_string=$1
-    if [[ -z $input_string ]];then
+    if [[ -z $input_string ]]; then
         return
     fi
     input_string=${input_string// /}
-    IFS=',' read -r -a array <<< "$input_string"
+    IFS=',' read -r -a array <<<"$input_string"
     minx=${array[0]}
     miny=${array[1]}
     maxx=${array[2]}
@@ -35,22 +35,20 @@ function process_bbox(){
     echo "POLYGON(($minx $miny,$minx $maxy,$maxx $maxy,$maxx $miny,$minx $miny))"
 }
 
-if [[ $BBOXES == "-" ]];then
-# BBOX passed on stdin
+if [[ $BBOXES == "-" ]]; then
+    # BBOX passed on stdin
     if [ -t 0 ]; then
-    # if do not allow interactive tty
+        # if do not allow interactive tty
         usage
-        exit 1
     fi
-    while read -r line
-    do  
+    while read -r line; do
         process_bbox "$line"
-    done < "/dev/stdin"
+    done <"/dev/stdin"
 else
-# BBOX passed as argument
+    # BBOX passed as argument
     IFS=$'\n'
     # shellcheck disable=2013
-    for BBOX in $(grep --perl-regexp --only-matching '((-?\d*\.?\d*)\s?,\s?(-?\d*\.?\d*)\s?,\s?(-?\d*\.?\d*)\s?,\s?(-?\d*\.?\d*))\s?'  <<<"$BBOXES");do
+    for BBOX in $(grep --perl-regexp --only-matching '((-?\d*\.?\d*)\s?,\s?(-?\d*\.?\d*)\s?,\s?(-?\d*\.?\d*)\s?,\s?(-?\d*\.?\d*))\s?' <<<"$BBOXES"); do
         BBOX="${BBOX//[[:space:]]/}"
         process_bbox "$BBOX"
     done
