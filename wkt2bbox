@@ -23,10 +23,10 @@ function process_wktstring() {
     local input_string
     input_string="$1"
 
-    if [[ "$input_string" == *POLYGON* ]]; then
-        echo "$input_string" | perl -pe 's/POLYGON\s?\(\((-?\d+\.?\d*)\s(-?\d+\.?\d*),-?\d+\.?\d*\s-?\d+\.?\d*,(-?\d+\.?\d*)\s(-?\d+\.?\d*),.*$/$1,$2,$3,$4/'
+    if [[ "${input_string,,}" == *polygon* ]]; then
+        echo "$input_string" | perl -pe 's/POLYGON\s?\(\((-?\d+\.?\d*)\s(-?\d+\.?\d*),\s?-?\d+\.?\d*\s-?\d+\.?\d*,\s?(-?\d+\.?\d*)\s(-?\d+\.?\d*),.*$/$1,$2,$3,$4/i'
     else
-        echo "$input_string" | perl -pe 's/BOX\((-?\d+\.?\d*)\s(-?\d+\.?\d*),(-?\d+\.?\d*)\s(-?\d+\.?\d*)\).*$/$1,$2,$3,$4/'
+        echo "$input_string" | perl -pe 's/BOX\((-?\d+\.?\d*)\s(-?\d+\.?\d*),\s?(-?\d+\.?\d*)\s(-?\d+\.?\d*)\).*$/$1,$2,$3,$4/i'
     fi
 }
 
