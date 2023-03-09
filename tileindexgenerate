@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# requires:
+# - gnu parallel
+# - gdal
+# - perl
+# - jq
+
+PROGRAM_NAME=$(basename "$0")
+RASTERS_LIST_FILE="$1"  # create RASTERS_LIST_FILE for instance with: RASTERS_LIST_FILE=$(mktemp);rclone lsf -R my_storage_account:$tif_path --include="*.tif" | xargs printf "/vsicurl/https://my_storage_account.blob.core.windows.net/$tif_path/%s\n" > $RASTERS_LIST_FILE;
+PERL_REPLACE_REGEX="$2" # Perl regex replace pattern to extract bladnummer from filename 's|^M_(.*)\.tif$|\1|'
+GPKG_OUTPUT_FILE="$3"
+
+CSV_OUTPUT_FILE=$(mktemp --suffix=.csv)
+
+function usage {
+    echo "Generate GeoPackage tileindex for list of raster files"
+    echo ""
+    echo "usage: $PROGRAM_NAME <rasters_list_file> <perl_replace_regex> <gpkg_output> "
+    echo "    - <rasters_list_file>: file containing filepaths to raster files (can be /vsicurl urls)"
+    # shellcheck disable=SC2028
+    echo "    - <perl_replace_regex>: perl regex replace pattern to extract index identifier from filename, for instance: 's|^M_(.*)\.tif$|\1|'"
+    echo "    - <gpkg_output>: GeoPackage output filepath"
+    exit 1
+}
+
+if [[ "$#" -lt 3 ]]; then
+    usage
+fi
+
+function generate_csv_line() {
+    RASTER_FILE="$1"
+    echo "processing ${RASTER_FILE}"
+    blad_nr=$(basename "$RASTER_FILE" | perl -pe "$PERL_REPLACE_REGEX")
+    bbox=$(gdalinfo -json "$RASTER_FILE" | jq -r '.cornerCoordinates | "\(.lowerLeft | join(",")),\(.upperRight | join(","))"')
+    IFS=',' read -r -a array <<<"$bbox"
+    minx=${array[0]}
+    miny=${array[1]}
+    maxx=${array[2]}
+    maxy=${array[3]}
+    WKT="POLYGON(($minx $miny,$minx $maxy,$maxx $maxy,$maxx $miny,$minx $miny))"
+    echo "\"${WKT}\",\"${blad_nr}\"" >>"$CSV_OUTPUT_FILE"
+}
+
+function main() {
+    export -f generate_csv_line
+    export CSV_OUTPUT_FILE
+    export PERL_REPLACE_REGEX
+    echo '"WKT","bladnr"' >"$CSV_OUTPUT_FILE"
+    parallel -j20 'generate_csv_line {}' <"$RASTERS_LIST_FILE"
+    ogr2ogr -f GPKG "$GPKG_OUTPUT_FILE" "$CSV_OUTPUT_FILE" -a_srs "EPSG:28992" -nln bladindex
+    echo "generated bladindex in: ${GPKG_OUTPUT_FILE}"
+}
+
+main
