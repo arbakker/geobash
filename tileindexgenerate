@@ -6,36 +6,67 @@
 # - jq
 
 PROGRAM_NAME=$(basename "$0")
-RASTERS_LIST_FILE="$1"  # create RASTERS_LIST_FILE for instance with: RASTERS_LIST_FILE=$(mktemp);rclone lsf -R my_storage_account:$tif_path --include="*.tif" | xargs printf "/vsicurl/https://my_storage_account.blob.core.windows.net/$tif_path/%s\n" > $RASTERS_LIST_FILE;
-PERL_REPLACE_REGEX="$2" # Perl regex replace pattern to extract bladnummer from filename 's|^M_(.*)\.tif$|\1|'
-GPKG_OUTPUT_FILE="$3"
-LAYER_NAME="${4:-tileindex}"
-TILE_ID_FIELD_NAME="${5:-tile_identifier}"
-
-CSV_OUTPUT_FILE=$(mktemp /tmp/bladindex_XXXXXX.csv) # prefix bladindex_ is important otherwise cannot be used as layer identifier in ogr2ogr
 
 function usage {
     echo "Generate GeoPackage tileindex for list of raster files"
     echo ""
-    echo "usage: $PROGRAM_NAME <rasters_list_file> <perl_replace_regex> <gpkg_output> <layername=tileindex> <tile_id_field_name=tile_identifier>"
+    echo "usage: $PROGRAM_NAME  [options] <rasters_list_file> <perl_replace_regex> <gpkg_output>"
     echo "    - <rasters_list_file>: file containing filepaths to raster files (can be /vsicurl urls)"
     # shellcheck disable=SC2028
     echo "    - <perl_replace_regex>: perl regex replace pattern to extract index identifier from filename, for instance: 's|^M_(.*)\.tif$|\1|'"
-    echo "    - <gpkg_output>: GeoPackage output filepath"
-    echo "    - <layername>: Name of tileindex layer in output GeoPackage"
-    echo "    - <tile_id_field_name>: field name ot tile identifier in tileindex layer"
+    echo "    - <output_file>: ogr output filepath"
+    echo "    options:"
+    echo "    - -t <output-property-template>: template to render value in output property with index identifier, default: %s"
+    echo "    - -p <output-property-name>: output property name, default: url"
+    echo "    - -l <layer-name>: layer name, default: tileindex"
+    echo "    - -f <output-format>: ogr output format, needs to match extension of output_file, default: GPKG"
 
     exit 1
 }
 
-if [[ "$#" -lt 3 ]]; then
+OUTPUT_PROPERTY_VALUE_TEMPLATE="%s"
+OUTPUT_PROPERTY_NAME="url"
+LAYER_NAME="tileindex"
+OUTPUT_FORMAT="GPKG"
+
+while getopts "t:p:l:f:" option; do
+    case "${option}" in
+    t)
+        OUTPUT_PROPERTY_VALUE_TEMPLATE="${OPTARG}"
+        ;;
+    p)
+        OUTPUT_PROPERTY_NAME="${OPTARG}"
+        ;;
+    l)
+        LAYER_NAME="${OPTARG}"
+        ;;
+    f)
+        OUTPUT_FORMAT="${OPTARG}"
+        ;;
+    *)
+        usage
+        ;;
+    esac
+done
+shift $((OPTIND - 1))
+
+if [[ "$#" -ne 3 ]]; then
     usage
 fi
+
+RASTERS_LIST_FILE="$1"  # create RASTERS_LIST_FILE for instance with: RASTERS_LIST_FILE=$(mktemp);rclone lsf -R my_storage_account:$tif_path --include="*.tif" | xargs printf "/vsicurl/https://my_storage_account.blob.core.windows.net/$tif_path/%s\n" > $RASTERS_LIST_FILE;
+PERL_REPLACE_REGEX="$2" # Perl regex replace pattern to extract bladnummer from filename 's|^M_(.*)\.tif$|\1|'
+OGR_OUTPUT_FILE="$3"
+
+CSV_OUTPUT_FILE=$(mktemp /tmp/bladindex_XXXXXX.csv) # prefix bladindex_ is important otherwise cannot be used as layer identifier in ogr2ogr
 
 function generate_csv_line() {
     RASTER_FILE="$1"
     echo "processing ${RASTER_FILE}"
     blad_nr=$(basename "$RASTER_FILE" | perl -pe "$PERL_REPLACE_REGEX")
+    # shellcheck disable=SC2059
+    blad_nr=$(printf "$OUTPUT_PROPERTY_VALUE_TEMPLATE" "$blad_nr")
+    echo "$OUTPUT_PROPERTY_VALUE_TEMPLATE - $blad_nr"
     bbox=$(gdalinfo -json "$RASTER_FILE" | jq -r '.cornerCoordinates | "\(.lowerLeft | join(",")),\(.upperRight | join(","))"')
     IFS=',' read -r -a array <<<"$bbox"
     minx=${array[0]}
@@ -50,12 +81,13 @@ function main() {
     export -f generate_csv_line
     export CSV_OUTPUT_FILE
     export PERL_REPLACE_REGEX
-    echo '"WKT","'"$TILE_ID_FIELD_NAME"'"' >"$CSV_OUTPUT_FILE"
+    export OUTPUT_PROPERTY_VALUE_TEMPLATE
+    echo '"WKT","'"$OUTPUT_PROPERTY_NAME"'"' >"$CSV_OUTPUT_FILE"
     parallel -j20 'generate_csv_line {}' <"$RASTERS_LIST_FILE"
     filename=$(basename "$CSV_OUTPUT_FILE")
     layername="${filename%.*}"
-    ogr2ogr -f GPKG "$GPKG_OUTPUT_FILE" "$CSV_OUTPUT_FILE" -sql "select ${TILE_ID_FIELD_NAME} from ${layername}" -a_srs "EPSG:28992" -nln "$LAYER_NAME"
-    echo "generated bladindex in: ${GPKG_OUTPUT_FILE}"
+    ogr2ogr -f "$OUTPUT_FORMAT" "$OGR_OUTPUT_FILE" "$CSV_OUTPUT_FILE" -sql "select ${OUTPUT_PROPERTY_NAME} from ${layername}" -a_srs "EPSG:28992" -nln "$LAYER_NAME"
+    echo "generated bladindex in: ${OGR_OUTPUT_FILE}"
 }
 
 main
