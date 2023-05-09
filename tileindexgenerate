@@ -28,8 +28,9 @@ OUTPUT_PROPERTY_VALUE_TEMPLATE="%s"
 OUTPUT_PROPERTY_NAME="url"
 LAYER_NAME="tileindex"
 OUTPUT_FORMAT="GPKG"
+SRS="EPSG:28992"
 
-while getopts "t:p:l:f:" option; do
+while getopts "s:t:p:l:f:" option; do
     case "${option}" in
     t)
         OUTPUT_PROPERTY_VALUE_TEMPLATE="${OPTARG}"
@@ -42,6 +43,9 @@ while getopts "t:p:l:f:" option; do
         ;;
     f)
         OUTPUT_FORMAT="${OPTARG}"
+        ;;
+    s)
+        SRS="${OPTARG}"
         ;;
     *)
         usage
@@ -86,7 +90,7 @@ function main() {
     parallel -j20 'generate_csv_line {}' <"$RASTERS_LIST_FILE"
     filename=$(basename "$CSV_OUTPUT_FILE")
     layername="${filename%.*}"
-    ogr2ogr -f "$OUTPUT_FORMAT" "$OGR_OUTPUT_FILE" "$CSV_OUTPUT_FILE" -sql "select ${OUTPUT_PROPERTY_NAME} from ${layername}" -a_srs "EPSG:28992" -nln "$LAYER_NAME"
+    ogr2ogr -f "$OUTPUT_FORMAT" "$OGR_OUTPUT_FILE" "$CSV_OUTPUT_FILE" -sql "select ${OUTPUT_PROPERTY_NAME} from ${layername}" -a_srs "$SRS" -nln "$LAYER_NAME"
     echo "generated bladindex in: ${OGR_OUTPUT_FILE}"
 }
 
