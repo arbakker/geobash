@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+PROGRAM_NAME=$(basename "$0")
+OUTPUT_FILE="$1"
+INPUT_FILE="$2"
+TMS="$3"
+Z="$4"
+Y="$5"
+X="$6"
+SCRIPT_DIR=$(dirname "$0")
+
+function usage {
+    echo "Convert MVT (mapbox vector tile) to geopackage. Requires ogr2ogr, gdalsrsinfo and jq to be available in PATH"
+    echo ""
+    echo "usage: $PROGRAM_NAME <out_file> <mvt_file> <tms> <z> <y> <x>"
+    echo "    - <out_file>: output file (.gpkg)"
+    echo "    - <mvt_file>: mapbox vectortile file (.mvt or .pbf)"
+    echo "    - <tms>: tile matrix set name"
+    echo "    - <z>: z coord of the tile"
+    echo "    - <y>: y coord of the tile"
+    echo "    - <x>: x coord of the tile"
+    exit 1
+}
+
+if [ "$#" -ne 6 ]; then
+    usage
+fi
+
+set -euo pipefail
+
+function create_ogr_mvt_metadata() {
+  tms=$1
+  epsg=$(< "$SCRIPT_DIR/tms/$tms.json" jq -re '.crs | capture("(?i)epsg.+?(?<epsg>[0-9]{3,})") | .epsg')
+  [[ -z $epsg ]] && echo >&2 "epsg not found" && exit 1
+  tm0=$(< "$SCRIPT_DIR/tms/$tms.json" jq -re '.tileMatrices[] | select((.id|tonumber) == 0)')
+  [[ $(echo "$tm0" | jq -re '.tileWidth == .tileHeight') != true ]] && echo >&2 "only square tiles supported" && exit 1
+  tile_dim=$(echo "$tm0" | jq -re '.tileWidth * .cellSize')
+  [[ $(echo "$tm0" | jq -re '.cornerOfOrigin // "topLeft"') != "topLeft" ]] && echo >&2 "only topLeft origin supported" && exit 1
+  origin_x=$(echo "$tm0" | jq -re '.pointOfOrigin[0]')
+  origin_y=$(echo "$tm0" | jq -re '.pointOfOrigin[1]')
+  north_line=$(gdalsrsinfo "epsg:$epsg" | grep -niP 'axis.+north' |  grep -oP "^\d+" | head -1)
+  east_line=$(gdalsrsinfo "epsg:$epsg" | grep -niP 'axis.+east' |  grep -oP "^\d+" | head -1)
+  if [[ "$north_line" -lt "$east_line" ]]; then
+    swap="$origin_x"
+    origin_x="$origin_y"
+    origin_y="$swap"
+  fi
+  metadata_file="$2"
+  cat <<JSON > "$metadata_file"
+  { "crs": "EPSG:${epsg}",
+    "tile_origin_upper_left_x": ${origin_x},
+    "tile_origin_upper_left_y": ${origin_y},
+    "tile_dimension_zoom_0": ${tile_dim} }
+JSON
+  echo "$metadata_file"
+}
+
+function gunzip_tile() {
+  tile="$1"
+  tile_unzipped="$2"
+  if gzip -t "$tile" >/dev/null 2>&1; then
+    < "$tile" gzip -d > "$tile_unzipped"
+  else
+    cp -p "$tile" "$tile_unzipped"
+  fi
+  echo "$tile_unzipped"
+}
+
+trap 'rm -f "$INPUT_FILE_UNZIPPED" "$METADATA_FILE"' EXIT
+INPUT_FILE_UNZIPPED=$(gunzip_tile "$INPUT_FILE" "$(mktemp --suffix=.mvt)")
+METADATA_FILE=$(create_ogr_mvt_metadata "$TMS" "$(mktemp --suffix=.json)")
+ogr2ogr -f gpkg "$OUTPUT_FILE" "$INPUT_FILE_UNZIPPED" -oo Z="$Z" -oo X="$X" -oo Y="$Y" -oo METADATA_FILE="$METADATA_FILE" -nlt PROMOTE_TO_MULTI
