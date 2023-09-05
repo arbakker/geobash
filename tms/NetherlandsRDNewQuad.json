@@ -174,6 +174,16 @@
       "tileHeight": 256,
       "matrixWidth": 65536,
       "matrixHeight": 65536
+    },
+    {
+      "id": "17",
+      "pointOfOrigin": [-285401.92, 903401.92],
+      "scaleDenominator": 93.75,
+      "cellSize": 0.02625,
+      "tileWidth": 256,
+      "tileHeight": 256,
+      "matrixWidth": 131072,
+      "matrixHeight": 131072
     }
   ]
 }

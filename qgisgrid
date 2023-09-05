@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+PROGRAM_NAME=$(basename "$0")
+TMS="$1"
+Z="$2"
+BBOX="$3"
+SCRIPT_DIR=$(dirname "$0")
+
+function usage {
+    echo "Calculate the parameters for drawing a grid for a TMS in QGis. Requires gdalsrsinfo and jq to be available in PATH."
+    echo ""
+    echo "usage: $PROGRAM_NAME <tms> <z> <bbox>"
+    echo "    - <tms>: tile matrix set name"
+    echo "    - <z>: tile matrix id a.k.a. zoom level"
+    echo "    - <bbox>: \$minx,\$miny,\$maxx,\$maxy"
+    exit 1
+}
+
+if [ "$#" -ne 3 ]; then
+    usage
+fi
+
+set -euo pipefail
+
+epsg=$(< "$SCRIPT_DIR/tms/$TMS.json" jq -re '.crs | capture("(?i)epsg.+?(?<epsg>[0-9]{3,})") | .epsg')
+[[ -z $epsg ]] && echo >&2 "epsg not found" && exit 1
+tm=$(< "$SCRIPT_DIR/tms/$TMS.json" jq -re --argjson Z "$Z" '.tileMatrices[] | select((.id|tonumber) == $Z)')
+[[ $(echo "$tm" | jq -re '.tileWidth == .tileHeight') != true ]] && echo >&2 "only square tiles supported" && exit 1
+cell_size=$(echo "$tm" | jq -re '.cellSize')
+[[ $(echo "$tm" | jq -re '.cornerOfOrigin // "topLeft"') != "topLeft" ]] && echo >&2 "only topLeft origin supported" && exit 1
+origin_x=$(echo "$tm" | jq -re '.pointOfOrigin[0]')
+origin_y=$(echo "$tm" | jq -re '.pointOfOrigin[1]')
+north_line=$(gdalsrsinfo "epsg:$epsg" | grep -niP 'axis.+north' |  grep -oP "^\d+" | head -1)
+east_line=$(gdalsrsinfo "epsg:$epsg" | grep -niP 'axis.+east' |  grep -oP "^\d+" | head -1)
+if [[ "$north_line" -lt "$east_line" ]]; then
+  swap="$origin_x"
+  origin_x="$origin_y"
+  origin_y="$swap"
+fi
+
+bbox_min_x=$(echo "$BBOX" | awk -F, '{print $1}')
+bbox_min_y=$(echo "$BBOX" | awk -F, '{print $2}')
+bbox_max_x=$(echo "$BBOX" | awk -F, '{print $3}')
+bbox_max_y=$(echo "$BBOX" | awk -F, '{print $4}')
+
+diff_x=$(bc <<< "scale=10; $bbox_min_x - $origin_x")
+diff_cells_x=$(bc <<< "scale=0; $diff_x / $cell_size")
+grid_min_x=$(bc <<< "scale=10; $origin_x + $diff_cells_x * $cell_size")
+diff_y=$(bc <<< "scale=10; $origin_y - $bbox_max_y")
+diff_cells_y=$(bc <<< "scale=0; $diff_y / $cell_size")
+grid_max_y=$(bc <<< "scale=10; $origin_y - $diff_cells_y * $cell_size")
+width_x=$(bc <<< "scale=10; $bbox_max_x - $bbox_min_x")
+cells_x=$(bc <<< "scale=0; $width_x / $cell_size")
+grid_max_x=$(bc <<< "scale=10; $grid_min_x + $cells_x * $cell_size")
+width_y=$(bc <<< "scale=10; $bbox_max_y - $bbox_min_y")
+cells_y=$(bc <<< "scale=0; $width_y / $cell_size")
+grid_min_y=$(bc <<< "scale=10; $grid_max_y - $cells_y * $cell_size")
+
+echo "In QGis go to Vector -> Research Tools -> Create Grid"
+echo "Grid extent: $grid_min_x,$grid_max_x,$grid_min_y,$grid_max_y [EPSG:$epsg]"
+echo "Spacing: $cell_size"
